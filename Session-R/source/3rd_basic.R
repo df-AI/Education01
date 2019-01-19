@@ -261,6 +261,183 @@ qnorm(0.95, 700, 100)
 # 전구의 평균 수명이 3,000시간, 표준편차가 80시간 일때 임의로 선택한 전구 1개의 수명이 2,948시간에서 3,080시간일 확률은? 
 pnorm(3080, 3000, 80) - pnorm(2948, 3000, 80)
 
-#### t검정 #### 
+#### Z-분포 T-분포 ####
+# Z-Score
+library(ggplot2)
+theme_set(theme_bw())  
+
+# Data Prep
+data("mtcars")  # load data
+mtcars$`car name` <- rownames(mtcars)  # create new column for car names
+mtcars$mpg_z <- round((mtcars$mpg - mean(mtcars$mpg))/sd(mtcars$mpg), 2)  # compute normalized mpg
+mtcars$mpg_type <- ifelse(mtcars$mpg_z < 0, "below", "above")  # above / below avg flag
+mtcars <- mtcars[order(mtcars$mpg_z), ]  # sort
+mtcars$`car name` <- factor(mtcars$`car name`, levels = mtcars$`car name`)  # convert to factor to retain sorted order in plot.
+
+# Diverging Barcharts
+ggplot(mtcars, aes(x=`car name`, y=mpg_z, label=mpg_z)) + 
+  geom_bar(stat='identity', aes(fill=mpg_type), width=.5)  +
+  scale_fill_manual(name="Mileage", 
+                    labels = c("Above Average", "Below Average"), 
+                    values = c("above"="#00ba38", "below"="#f8766d")) + 
+  labs(subtitle="Normalised mileage from 'mtcars'", 
+       title= "Diverging Bars") + 
+  coord_flip()
+
+#### One Sample T-Test ####
+set.seed(1234)
+# 가상의 데이터 만들기
+weight_data <- data.frame(
+  ID = paste0(rep("A_", 10), 1:10),
+  weight = round(rnorm(10, 20, 2), 1)
+)
+
+# 데이터
+head(weight_data, 10)
+
+# 기초 통계량
+summary(weight_data$weight)
+
+# 시각화
+library(ggpubr)
+ggboxplot(weight_data$weight, 
+          ylab = "Weight (g)", xlab = FALSE,
+          ggtheme = theme_minimal())
+
+# 질문 1. 데이터의 크기? 10보다 작음
+# 질문 2. 데이터의 정규성 확인
+
+# 방법 1. Shapiro-Wilk test:
+# 귀무가설: 데이터는 정규성 분포를 이루고 있다. 
+# 대립가설: 데이터는 정규성 분포를 이루고 있지 않다. 
+shapiro.test(weight_data$weight) # => p-value = 0.12
+# 해석? 데이터의 분포가 정규성 분포를 이루는 데이터와 통계적으로 유의하게 다르지 않다. 
+# 다시 말하면, 위 데이터는 정규분포를 이루고 있음
+
+# 방법 2. Q-Q 그래프
+library("ggpubr")
+ggqqplot(my_data$weight, ylab = "Men's weight",
+         ggtheme = theme_minimal())
+
+# 만약 정규성이 위배된다면 윌콕슨 검정을 시행한다.
+
+# 질문. 평균 무게가 25g과 다른지 알고 싶음
+# 단일표본
+(res <- t.test(my_data$weight, mu = 25))
+
+# 위 결과에 대한 해석은? 
+# P value가 0.05보다 작다는 뜻은, 평균 무게가 25g보다 p-value 7.95310^{-6}를 가지고 유의하게 다르다
+
+# 평균 무게가 25g보다 작을까?
+t.test(my_data$weight, mu = 25,
+       alternative = "less")
+
+# 평균 무게가 25g보다 클까?
+t.test(my_data$weight, mu = 25,
+       alternative = "greater")
+
+#### 독립 표본 ####
+# 남녀 무게 데이터
+women_weight <- c(38.9, 61.2, 73.3, 21.8, 63.4, 64.6, 48.4, 48.8, 48.5)
+men_weight <- c(67.8, 77.1, 73.2, 74.1, 89.4, 73.3, 67.3, 67.6, 62.4) 
+
+# Create a data frame
+class_weight <- data.frame( 
+  group = rep(c("Woman", "Man"), each = 9),
+  weight = c(women_weight,  men_weight)
+)
+
+print(class_weight)
+
+# 그룹별로 요약하기
+library(dplyr)
+group_by(class_weight, group) %>%
+  summarise(
+    count = n(),
+    mean = mean(weight, na.rm = TRUE),
+    sd = sd(weight, na.rm = TRUE)
+  )
+
+library("ggpubr")
+ggboxplot(class_weight, x = "group", y = "weight", 
+          color = "group", palette = c("blue", "red"),
+          ylab = "Weight", xlab = "Groups")
+
+# 가정 1. 두 그룹이 독립적인가?
+# 가정 2. 두 그룹 모두 정규성을 이루는가?
+
+# 남자 그룹에 대한 정규성 검정
+with(class_weight, shapiro.test(weight[group == "Man"]))# p = 0.241
+
+# 여자 그룹에 대한 정규성 검정
+with(class_weight, shapiro.test(weight[group == "Woman"])) # p = 0.6
+
+# 만약, 데이터가 정규성을 이루지 않는다고 한다면, 윌콕슨 순위 검정을 시행한다. 
+
+# 가정 3. 두 그룹의 분산값이 동일한가?
+(res.ftest <- var.test(weight ~ group, data = my_data))
+# P-Value 0.1714
+
+# 해석은? 
+# 두 그룹의 분산값이 통계적으로 유의하게 다르지 않음, 다시 말하면, 분산값이 비슷하다는 가정
+
+# 남자 그룹과 여자 그룹에 차이가 존재하는가? 
+(res <- t.test(women_weight, men_weight, var.equal = TRUE))
+(res <- t.test(weight ~ group, data = class_weight, var.equal = TRUE))
+
+#### 대응 표본 ####
+# 실적 데이터
+before <-c(200.1, 190.9, 192.7, 213, 241.4, 196.9, 172.2, 185.5, 205.2, 193.7)
+
+# 광고 후 실적
+after <-c(392.9, 393.2, 345.1, 393, 434, 427.9, 422, 383.9, 392.3, 352.2)
+
+# Create a data frame
+revenue_data <- data.frame( 
+  group = rep(c("before", "after"), each = 10),
+  revenue = c(before,  after)
+)
+
+print(revenue_data)
+
+library("dplyr")
+group_by(revenue_data, group) %>%
+  summarise(
+    count = n(),
+    mean = mean(revenue, na.rm = TRUE),
+    sd = sd(revenue, na.rm = TRUE)
+  )
+
+library("ggpubr")
+ggboxplot(revenue_data, x = "group", y = "revenue", 
+          color = "group", palette = c("#00AFBB", "#E7B800"),
+          order = c("before", "after"),
+          ylab = "revenue", xlab = "Groups")
+
+# 광고 전 실적 데이터
+before <- subset(revenue_data,  group == "before", revenue,
+                 drop = TRUE)
+
+# 광고 후 실적 데이터
+after <- subset(revenue_data,  group == "after", revenue,
+                drop = TRUE)
+# Plot paired data
+library(PairedData)
+pd <- paired(before, after)
+plot(pd, type = "profile") + theme_bw(base_size = 32)
+
+# 가정 1. 두 샘플이 대응인가?
+# 가정 2. 샘플의 크기가 큰가? 크지 않다면, 정규성 검정을 시행한다. 
+# 가정 3. 정규성 검정을 실시한다. 
+
+# 차이 계산
+d <- with(revenue_data, 
+          revenue[group == "before"] - revenue[group == "after"])
+# 차이에 대한 정규성 검정
+shapiro.test(d) # => p-value = 0.6141
+
+# 검정방법
+(res <- t.test(before, after, paired = TRUE))
+(res <- t.test(revenue ~ group, data = revenue_data, paired = TRUE))
 
 
