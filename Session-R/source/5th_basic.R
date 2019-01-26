@@ -119,10 +119,12 @@ impact <- CausalImpact(ads_analysis,         # 시계열 모형 데이터
                        pre.period,           # 광고 전 기간
                        post.period)          # 광고 기간
 
-# 5. 결과 시각화 그래프
+# 5. 결과 시각화 그래프~ 
 plot(impact)
 
 # 6. 결과 설명
 summary(impact, "report")
 
+
+### 테스트 테스트
 
